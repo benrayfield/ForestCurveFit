@@ -1,0 +1,104 @@
+<script>
+/*
+This is a variant of getThe10DataPointsWorkingWith4201DimensionalScalarFieldGpujsThenGoForNeuralQlearningOf3BouncingBalls. Do it this way cuz i can custom design, choose amounts of multiplies plusses sines sqrts etc, a func that can be computed really freakin fast in GPU cuz has very few dimensions and temporary vars. i wanna do it as scalar field of loss function over all the model weights, and combine that with the input output pairs that it should learn. it should learn the qscore of 12 dimensions to 1 dimension in case of my 3 bouncing balls. remember that all math ops, except maybe sqrt divide absval etc (cuz need to start positive) can be computed similar to mul(x,y)=tanh(atanh(x)*atanh(y)) allows mul(a,mul(b,c))=mul(mul(a,b),c) and keeps all numbers in range -1 to 1. Make this kind of neuralnet. try it with some simple data and simple models, then upgrade to neural qwlearning of 3 bouncing balls trying to raise one of the balls by moving one of the other balls so is similar to cartpole and other simple games like in openaiGym. Do this asap before get back to wikibinator.
+
+Frustrated with tensorflowjs doing just around 100 megaflops when i was expecting 40 gigaflops....
+screw this. im gonna make my own GPU optimized curve fitter. not a neuralnet specificly. just a really powerful browser GPU optimized curve fitter for forest of + * / sine arcsine exp log etc, with n input nodes, such as the 12 dimensions of yPosition xPosition yVelocity xVelocity for 3 bouncing balls i want to neural-qlearn on. my 15376 dimensional 4SAT solver is such a curve fitter. and im gonna pull that full teraflop from browser.
+i dont need a neuralnet for sat solving since i defined a custom energy function that has lower energy the more SAT constraints are solved
+you can play with it here. paint with 2 mouse buttons and rule110 grows on things https://memecombinator.io/experiments/ConvfieldDemo3.html
+
+S:\q\q45x\w\forestcurvefit
+
+if u use loss function as a scalar field of numModelWeights dimensions, then you cant overfit, but you can get stuck in localmin
+
+my curve fitter will use a forest of up to 4096 flops (+ * sine arcsine exp log etc) so could contain very small neuralnets or arbitrary equations. gonna compile it to webgl shaders and have cpu kind too. tensorflowjs is gonna eat my dust. 32 bit opcodes. 12 bits for each of 2 pointers lower in an array, and 8 bits to choose which math op
+
+
+i'll be able to learn some very simple functions in less than a millisecond
+
+i think 1 teraflop should work ok. compile the whole up to 4096 dimensional scalar field to fit in a GPU core. run it on a bunch of starting positions in parallel. no backprop. calculus directly between the inputs and output. u change this input by epsilon, how much does the output change. up to 4096 times
+
+up to 4096*32 bits. its 32 bits per opcode. its basically, each int tells it which 2 array indexs to read 2 scalars from, and the other 8 bits tells it what to do with them * + log sine etc, then write the result in current index
+*/
+
+const log2OfMaxOpcodes = 8;
+const log2OfMaxVecFieldOpcodes = 12;
+const maxOpcodes = 2**log2OfMaxOpcodes; //+ * sine arcsine etc. must be a powOf2.
+const maxVecFieldOpcodes = 2**log2OfMaxVecFieldOpcodes; //must be a powOf2
+const maskPtrAfterSlide = maxVecFieldOpcodes-1; //use this OR [slideA and slideB]
+const slideA = log2OfMaxOpcodes;
+const slideB = log2OfMaxOpcodes+log2OfMaxVecFieldOpcodes;
+const maskA = (maxVecFieldOpcodes-1)<<slideA; //fits in int opcode
+const maskB = (maxVecFieldOpcodes-1)<<slideB; //fits in int opcode
+const maskOp = maxOpcodes-1; //no slide cuz its lowest. fits in int opcode.
+
+//vars inc
+var VecField = function(numInputs, numTempVars, numOutputs){
+	this.numVars = numInputs+numTempVars+numOutputs;
+	if(this.numVars > 
+	this.numInputs = numInputs; //TODO make an opcode that means input so dont replace it in the array?
+	this.numTempVars = numTempVars;
+	this.numOutputs = numOutputs;
+	//opcode has 2 pointers at lower index and a byte to specify 1 of: + * sine arcsine etc.
+	//It reads 2 scalars at those 2 indexs then writes current index with the + or * etc of those 2 things.
+	this.opcodes = new Int32Array(this.numVars);
+};
+
+VecField.prototype.run = function(arr){
+	if(arr.length != this.numVars){
+		throw 'Expected arr.length to be '+this.numVars+' but its '+arr.length;
+	}
+	for(let i=this.numInputs; i<this.numVars; i++){
+		let opcode = this.opcodes[i];
+		let ptrA = (opcode>>>slideA)&maskPtrAfterSlide;
+		let ptrB = (opcode>>>slideB)&maskPtrAfterSlide;
+		let whichMathOp = opcode&maskOp;
+		let numA = arr[ptrA];
+		let numB = arr[ptrB];
+		let ret;
+		switch(whichMathOp){
+		case 0: ret = numA;
+		break;case 1: ret = numB;
+		break;case 2: ret = -numA;
+		break;case 3: ret = numA-numB;
+		break;case 4: ret = numA+numB;
+		break;case 5: ret = numA*numB;
+		break;case 6: ret = numA/numB;
+		break;case 7: ret = numA%numB;
+		break;case 8: ret = Math.exp(numA);
+		break;case 9: ret = Math.pow(numA,numB);
+		break;case 10: ret = Math.log(numA);
+		break;case 11: ret = Math.sin(numA);
+		break;case 12: ret = Math.asin(numA);
+		break;case 13: ret = Math.cos(numA);
+		break;case 14: ret = Math.acos(numA);
+		break;case 15: ret = Math.tan(numA);
+		break;case 16: ret = Math.atan(numA);
+		break;case 17: ret = Math.tanh(numA);
+		break;case 18: ret = Math.atanh(numA);
+		default: ret = 0;
+		}
+		arr[i] = ret;
+	}
+};
+
+//returns a lambda that does the same thing as this.run(arr) when given arr param.
+//This will avoid the need for the switch statement. uses js eval. TODO.
+//TODO use cachedEval code (search for that) from my other code.
+VecField.prototype.compileForCpu = function(arr){
+	throw 'TODO';
+};
+
+//Example: 100 instances of 12 inputs so 1200 numbers. Float32Array in and out.
+//TODO GPU.js optimize. reuse same kernel so its much lower lag after first time.
+//TODO an option to compute derivatives and try variants without copying the memory in,
+//generating most inputs instead, cuz that will be alot faster in gpujs.
+//Returns concat of the outputs as a Float32Array.
+VecField.prototype.runManyOnGPU = function(manyInputs){
+	throw 'TODO';
+};
+
+//TODO curvefit by rolling ball around aVecField.numInputs and numOutputs is 1 as a scalar field,
+//with momentum and velocity decay, just looking for a low energy (valley/hole) to stop in.
+
+</script>
