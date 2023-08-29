@@ -1,0 +1,963 @@
+<script>
+/*
+
+TODO rewrite some of this text.
+
+
+This is a variant of getThe10DataPointsWorkingWith4201DimensionalScalarFieldGpujsThenGoForNeuralQlearningOf3BouncingBalls. Do it this way cuz i can custom design, choose amounts of multiplies plusses sines sqrts etc, a func that can be computed really freakin fast in GPU cuz has very few dimensions and temporary vars. i wanna do it as scalar field of loss function over all the model weights, and combine that with the input output pairs that it should learn. it should learn the qscore of 12 dimensions to 1 dimension in case of my 3 bouncing balls. remember that all math ops, except maybe sqrt divide absval etc (cuz need to start positive) can be computed similar to mul(x,y)=tanh(atanh(x)*atanh(y)) allows mul(a,mul(b,c))=mul(mul(a,b),c) and keeps all numbers in range -1 to 1. Make this kind of neuralnet. try it with some simple data and simple models, then upgrade to neural qwlearning of 3 bouncing balls trying to raise one of the balls by moving one of the other balls so is similar to cartpole and other simple games like in openaiGym. Do this asap before get back to wikibinator.
+
+Frustrated with tensorflowjs doing just around 100 megaflops when i was expecting 40 gigaflops....
+screw this. im gonna make my own GPU optimized curve fitter. not a neuralnet specificly. just a really powerful browser GPU optimized curve fitter for forest of + * / sine arcsine exp log etc, with n input nodes, such as the 12 dimensions of yPosition xPosition yVelocity xVelocity for 3 bouncing balls i want to neural-qlearn on. my 15376 dimensional 4SAT solver is such a curve fitter. and im gonna pull that full teraflop from browser.
+i dont need a neuralnet for sat solving since i defined a custom energy function that has lower energy the more SAT constraints are solved
+you can play with it here. paint with 2 mouse buttons and rule110 grows on things https://memecombinator.io/experiments/ConvfieldDemo3.html
+
+S:\q\q45x\w\forestcurvefit
+
+if u use loss function as a scalar field of numModelWeights dimensions, then you cant overfit, but you can get stuck in localmin
+
+my curve fitter will use a forest of up to 4096 flops (+ * sine arcsine exp log etc) so could contain very small neuralnets or arbitrary equations. gonna compile it to webgl shaders and have cpu kind too. tensorflowjs is gonna eat my dust. 32 bit opcodes. 12 bits for each of 2 pointers lower in an array, and 8 bits to choose which math op
+
+
+i'll be able to learn some very simple functions in less than a millisecond
+
+i think 1 teraflop should work ok. compile the whole up to 4096 dimensional scalar field to fit in a GPU core. run it on a bunch of starting positions in parallel. no backprop. calculus directly between the inputs and output. u change this input by epsilon, how much does the output change. up to 4096 times
+
+up to 4096*32 bits. its 32 bits per opcode. its basically, each int tells it which 2 array indexs to read 2 scalars from, and the other 8 bits tells it what to do with them * + log sine etc, then write the result in current index
+
+theres a 6 dimensional scalar field displayed as 3 bouncing balls (12d game state including positions and
+velocities) in a html file, and the rule110 quasicrystal in another html file, since those are related
+to the math. see earlyExperiments dir. i think i should get the thing working before taking pics of it.
+
+theres a 6 dimensional scalar field displayed as 3 bouncing balls (12d game state
+including positions and velocities) in a html file, and the rule110 quasicrystal
+in another html file, since those are related to the math. see earlyExperiments dir.
+i think i should get the thing working before taking pics of it.
+
+i am gonna have so much fun with this thing. the little things it will allow me to do. like i could move stuff around a webpage in reaction to the mouse
+
+if i get live neural-qlearning working even for very very simple games (such as 12-100 dimensional game states) thats likely to go as viral cuz ppl will play the games and make up new games involving qlearning into the rules themselves
+
+2023-8-28[[ TODO
+designWayInForestcurvefitToSimTheRule110QuasicrystalWithJustAFewTimesMoreDimsByHavingManySmallParallelThingsToAddToFormTotalEnergy
+Also maybe should design way to fork n number of trainingData at once as loss func being
+high dimensional scalar field.
+Also remember that i plan to use this to make prototype of screwballscramble-like video games before
+porting them or parts of th em to wikib, and there will be lots of sparse pieces in MMG of energyfunc
+to sum together if it really is a huge 2d moving heightmap. And will use it for neuralqlearning of
+3 bouncing balls, and more later once get that working. And for musical instruments to compute it
+forward though not using that part for curvefitting.
+Also, should it support 2d convolution (and 1d 3d 4d and what others?) vs have to duplicate
+the int opcodes that many times, and this seems like another variant of running it n times
+in parallel and adding those to model the loss function of training a neuralnet for n input/output vec pairs.
+Also should this support other tensor ops such as matmul, that might be found in tensorflowjs,
+or should I keep it simple and more limited to the few usecases thought of so far and similar patterns?
+Those few usecases including simulating rule110 quasicrystal, painting with 2 mouse buttons
+white and black pixels and fitting a mandelbrot fractal to it, curvfy lines in 2d bend around
+obstacles as a puzzle game that AI can solve by curvefitting, neural-qlearning of at least 3 balls
+at once to simulate airhockey and AI players learning to play it and optionally for more than
+2 players at once adding more stuff to the game, musical instruments, etc.
+Also, do I want normal backprop vs only the kind of calculus done on all weight dimensions at once?
+TODO list the usecases, and the kinds of calculations andOr categories of those
+(like tensor ops is a category) needed to make those usecases happen,
+and choose a design before writing much more code.
+
+
+Trying to organize this...
+* given a vecN->vecM vecfield and T trainingData each a vecN and vecM, a way to only store the vecfield once but store the T*N inputs and EITHER (can choose either one, so this is really 2 or 3 ops) generate the T*M numbers OR generate a single number thats the sumOfSquaredError between the observed T*M numbers vs the given correct T*M numbers (what the inputs should generate near). This is an optimization to avoid duplicating the vecN->vecM again T times. Since its vecN (4 in the case of rule110 quasicrystal) to 1, these can be summed similar to how they're summed in the rule110 html quasicrystal demo, to adjust the velocity at each position (each pixel has a position and a velocity of its brightness) instead of having to do squared number of pixels the hard way (like will do it for neuralnets) but the rule110 html does it far more efficiently cuz its the sum of many energyfuncs.
+* convolutional 1d. just for math completeness, even though i probably wont use this one since need at least 1d space 1d time to do anything useful.
+* convolutional 2d. Example: rule110 quasicrystal. This is an optimization to avoid storing the vecN->num (energy func) centered on each pixel individually.
+* convolutional 3d. Example: conwayLife quasicrystal. FIXME might want it to wrap around at weird offsets to make glider? Could do just the parts at the wrap the slower way?
+* matmul AB BC.
+* vecN->vecM small vectorField 
+* sum of many energyfuncs, to be an energyfunc.
+
+todo look thru the tensorflop ops of what u can do with multiple tensors to make another tensor, and consider which of those i want a similar thing to in this software.
+
+What tensorflow is to a forest of tensors, ForestCurveFit (this software) is to to a forest of vectorfields. Combining vectorfields in various ways makes more vectorfields. In some cases by forking (similar to a loop but in parallel). Maybe in some cases by a sequential loop. In some cases by summing their outputs (like rule110 quasicrystal html sums potentialEnergy during computing calculus gradients), in some cases by concatting the outputs of 2 things resulting from same inputs. in some cases from concatting outputs and inputs so you just sum the quantity of each to get more outputs and more inputs, etc. This software should be able to run millions of sequential cycles per second, unlike I saw tensorflowjs do about 800 per second cuz its not designed for this kind of thing, or at least not in the webgl backend of it. I need at least 20,000 sequentially, times as much calculation per sound sample, to generate sound, for example. Tensorflow is functions making functions since the tensor view of it is lazyEvaled. But tensorflow wasnt designed for this kind of optimizing, and was not designed for what browser is fast at. It was designed as a desktop program first. Im designing from scratch to make it low lag and lots of CPU and GPU flops in browsers. And I think I can do it in alot smaller code than tensorflowjs is about 4mB nonminified and about 1mB minified. Im thinking closer to 50kB of code for the main code plus a few hundred kB for GPU.js optimization of it, plus the size of demos and experiments but you dont have to include those when you use it for other things.
+
+
+Dont let this bunch of extra stuff it could also distract me from the main usecase of training very small neuralnets (like of 12 input nodes and 300 total weights) live in browser optimized by GPU.js, on a given  set of vecN->vecM output pairs and having a loss function for all of that. Has to be really small. If thats 300 dimensions, then it has to compute it 1+300 times in parallel, with 300 different directions of epsilon, to get the gradient.
+Thats barely big enough to have any matmul in it. Maybe a few 10x10s, and raise size to 500 dims or 1000 dims. but thats about as big as i'd want it. maybe too big to use in realtime.
+What I need is a proofOfConcept that I can play with (and id like to show ppl but mostly its for me, cuz i need to understand the efficiency etc of it before i can make a guess at how hard neuralQlearning will be).
+So make a scalarfield for learning the spiral problem in https://playground.tensorflow.org/ and allow the user to put different include/exclude dots down with 2 mouse buttons and add those to training data. Just eval the model (whatever kind of model it is) on all the dots, and roll ball around the model weights. I think the problem is that neuralnet they're using only uses tanh but sine arcsine exp log / % + - etc (if tanh them and find a way to make them smooth or at least continuous position yet jagged in velocity etc) could model that better, AND using GPU it could explore alot more of the space 
+...
+https://playground.tensorflow.org/#activation=tanh&batchSize=10&dataset=spiral&regDataset=reg-plane&learningRate=0.03&regularizationRate=0&noise=0&networkShape=7,8,8,8,7,6&seed=0.22046&showTestData=false&discretize=false&percTrainData=50&x=true&y=true&xTimesY=false&xSquared=false&ySquared=false&cosX=false&sinX=false&cosY=false&sinY=false&collectStats=false&problem=classification&initZero=false&hideText=false
+
+
+
+
+
+
+see pic at https://twitter.com/benrayfield/status/1696288227072598377 and try the spiral at https://playground.tensorflow.org/ .
+
+For my doubletrianglemodel, either choose manually which mathops go at which index, or add another array (by concat) of weights for each op, so for diag size n, theres n*n doubletriangle array plus n*numops weights (that each such row should sum to 1 when normed) so each diag can be all the ops continuously. but would have to solve the problem with sqrt, divide, log, etc needing positive input, unless just absvaled the input but that creats a sharp corner, or could square the input and sqrt it later. but that doesnt work for sqrt. in any case, i can put funcs very near those in. remember m(x,y)=tanh(atanh(x)*atanh(y)) leads to m(x,m(y,z))==m(m(x,y),z) and that can keep any such op in range -1 to 1.
+
+For now manually choose the mathops per index while using doubletriangle array, and choose only the smooth ones. for example, only tanh and * and +1 etc or combined (1+tanh(sumA)*tanh(sumB).
+Reproduce what tensorflowplayground did with the spiral. this shouldnt take long to write the code.
+Make a html that displays it similarly, but just the part on the right with the 2 colors of dots to include and exclude, and let user paint more of those on there with 2 mouse buttons, and auto solve it. TODO.
+
+Also I do want the n^2+n*numOps model, thats an upgrade of the doubletriangle model that does NOT need opcodes since it explores all possible opcodes and all possible forests of them. Maybe it has 3 ops each so its n*3*numOps?
+]]
+*/
+
+const log2OfMaxOpcodes = 8;
+const log2OfMaxVecFieldOpcodes = 12;
+const maxOpcodes = 2**log2OfMaxOpcodes; //+ * sine arcsine etc. must be a powOf2.
+const maxVecFieldOpcodes = 2**log2OfMaxVecFieldOpcodes; //must be a powOf2
+const maskPtrAfterSlide = maxVecFieldOpcodes-1; //use this OR [slideA and slideB]
+const slideA = log2OfMaxOpcodes;
+const slideB = log2OfMaxOpcodes+log2OfMaxVecFieldOpcodes;
+const maskA = (maxVecFieldOpcodes-1)<<slideA; //fits in int opcode
+const maskB = (maxVecFieldOpcodes-1)<<slideB; //fits in int opcode
+const maskOp = maxOpcodes-1; //no slide cuz its lowest. fits in int opcode.
+
+var VecField = function(numInputs, numTempVars, numOutputs, isSquared){
+	
+	this.numVars = numInputs+numTempVars+numOutputs;
+	//if(this.numVars > 
+	this.numInputs = numInputs; //TODO make an opcode that means input so dont replace it in the array?
+	this.numTempVars = numTempVars;
+	this.numOutputs = numOutputs;
+	
+	//If this.isSquared, you use this.run(Float32Array size this.numVars**2 else just this.numVars).
+	//The squared way is 2 triangle arrays for neuralnet-like weightedSums before doing MathOp on those 2
+	//to define the next output number, stored in the diagonal of that array. The weights not on diagonal
+	//are only read here. You would normally change the weights using calculus gradients of the last number
+	//in the array (either way, squared or not)
+	//which is the last output index (and in case of a scalar field, the only output index).
+	this.isSquared = !!isSquared;
+	
+	//opcode has 2 pointers at lower index and a byte to specify 1 of: + * sine arcsine etc.
+	//It reads 2 scalars at those 2 indexs then writes current index with the + or * etc of those 2 things.
+	this.opcodes = new Int32Array(this.numVars);
+};
+
+const nonneg = x=>Math.max(0,x); //aka relu
+
+//https://en.wikipedia.org/wiki/Double-precision_floating-point_format
+const minNormalPositiveDouble = 2.2250738585072014e-308;
+const minSubnormalPositiveDouble = 4.9406564584124654e-324;
+
+//const positive = x=>Math.max(minNormalPositiveDouble,x);
+const positive = x=>Math.max(minSubnormalPositiveDouble,x);
+
+//range -1 to 1
+const bifraction = x=>Math.max(-1,Math.min(x,1));
+
+//const TanhedMathOp = function(whichMathOp, numA, numB){
+//	return Math.tanh(MathOp(whichMathOp, numA, numB));
+//};
+
+const randInt = max=>Math.floor(Math.random()*max);
+
+const randIntRange = (from,toExcl)=>(from+randInt(toExcl-from));
+
+const MathOp = function(whichMathOp, numA, numB){
+	let ret;
+	switch(whichMathOp){
+		//case 0: ret = NaN;
+		//case 0: ret = 0; //FIXME
+		case 0: ret = 1; //use this as neuralnet bias for the second inner loop in doubleTrianglePlusOnehotRectangleModelForward.
+			//FIXME find a way for this never to happen, not call MathOp cuz this means leave
+			//it in the array as it already is. Could take prev value as a param, but I'd rather
+			//not read it just to write the same value back. It seems I want to only call this
+			//when the value depends only on numA and numB, and if it is to leave the value as
+			//itself, dont call this. This will happen in (diagonal if squared, else direct)
+			//in indexs 0 to VecField.numInputs-1.
+		break;case 1: ret = numA;
+		break;case 2: ret = numB;
+		break;case 3: ret = -numA;
+		break;case 4: ret = numA-numB;
+		break;case 5: ret = numA+numB;
+		break;case 6: ret = numA*numB;
+		//break;case 7: ret = numA/numB;
+		break;case 7: ret = numA/nonneg(numB);
+		//break;case 8: ret = numA%nonneg(numB);
+		break;case 8: ret = numA%positive(numB); //FIXME what if its the smallest possible positive double? what about subnormal 0s?
+		break;case 9: ret = Math.exp(numA);
+		break;case 10: ret = Math.pow(nonneg(numA),numB);
+		break;case 11: ret = Math.log(nonneg(numA));
+		break;case 12: ret = Math.sin(numA);
+		break;case 13: ret = Math.asin(bifraction(numA));
+		break;case 14: ret = Math.cos(numA);
+		break;case 15: ret = Math.acos(bifraction(numA));
+		break;case 16: ret = Math.tan(numA);
+		break;case 17: ret = Math.atan(numA); //FIXME infinity range allowed?
+		break;case 18: ret = Math.tanh(numA);
+		break;case 19: ret = Math.atanh(bifraction(numA));
+		default: ret = 0;
+	}
+	return ret;
+};
+
+const numMathOps = 20; //FIXME keep in sync with MathOp switch, etc. TODO generated GPU.js and CPU js evaled code.
+
+//In theory this (after fix bugs) kind of neuralnet can choose a different 1 of 10 activationFunctions per node,
+//of 20 nodes, 1 node per layer, in 20^2+20*10=600 params. So a 600 dimensional scalar field,
+//or 3 outputs for red green blue. If 2 inputs x y could make interesting graphics
+//
+//The doubleTrianglePlusRectangle model is a neuralnet that has 1 node per layer
+//and chooses neuralActivationFunction separately per node, each using
+//(TODO choose one) either ceil(log2(numMathOps)) or numMathOps (oneHot) numbers.
+//Each such mathOp combines 2 numbers, that are made from tanh of weightedSums.
+//Cuz tanh is always between -1 and 1, there should be a few ops of multiply, that scale it inside the tanh,
+//considering that if m=tanh(atanh(x)*atanh(y)) then m(x,m(y,z))==m(m(x,y),z), and that can be done for many mathOps similarly,
+//but FIXME theres still jaggedness around sqrt(abs(x)), sqrt(max(0,x)), x/abs(y), x/max(0,y), etc.
+//Can explore various mathOps later to find which are smoother, which work better together, etc.
+//
+//For diagonal (of a matrix) size d, and given numMathOps, arr.length==d**2+d*numMathOps,
+//or maybe it should be arr.length==d**2+d*Math.ceil(Math.log2(numMathOps)).
+//Input nodes go on the diagonal of that d**2. Output node(s) (normally is just 1 but could be more) also go on that diagonal.
+//Choice of neuralActivationFunction per node on that diagonal is continous in the d*numMathOps or d*Math.ceil(Math.log2(numMathOps)) numbers.
+//
+//Returns Float32Array(...numNodes scalars starting with input nodes then temp nodes then output nodes...).
+//Does not modify any of the params.
+//
+//numInputs includes the constant 1, at arr[0] and ret[0], thats used as neuralnet bias. Will throw if its not 1.
+//
+var doubleTrianglePlusOnehotRectangleModelForward = function(numInputs, numNodes, numMathOps, arr){
+	let square = numNodes**2; //2 triangle arrays stored in a square array. 1 neuralnet layer per node.
+	let rect = numNodes*numMathOps; //smoothly choose mathOp per node
+	let expectArrSize = square+rect;
+	if(arr.length != expectArrSize){
+		throw 'Expected arr.length to be '+expectArrSize+' but its '+arr.length;
+	}
+	if(arr[0] != 1){
+		throw 'arr[0] must always be 1, used as neuralnet bias, but is '+arr[0];
+	}
+	//let ret = optionalReturnArray || new Float32Array(numNodes);
+	let ret = new Float32Array(numNodes);
+	//ret[0] = 1; //neuralnet bias
+	for(let n=0; n<numInputs; n++){ //copy visibleNodes/inputs
+		//FIXME should it be able to take input from optionalReturnArray? Id like to for parallel efficiency,
+		//but Id like NOT to cuz arr should be the only input, including visibleNodes input AND neuralnet weights
+		//and choice of neuralActivationFunction per node.
+		//ret[n] = arr[n];
+		ret[n] = arr[n*numNodes+n];
+	}
+	for(let n=numInputs; n<numNodes; n++){
+		let sumA = 0;
+		let sumB = 0;
+		for(let j=0; j<n; j++){ //sum left n-1 weights, and other is sum top n-1 weights, multiplied by other nodes.
+			//let incomingNeuralActivation = ret[j*numNodes+j];
+			let incomingNeuralActivation = ret[j];
+			let weightA = arr[n*numNodes+j];
+			let weightB = arr[j*numNodes+n];
+			sumA += weightA*incomingNeuralActivation;
+			sumB += weightB*incomingNeuralActivation;
+		}
+		//FIXME should this be a parameter, part of the int opcode, to tanh it vs leave it as is or what?
+		let numA = Math.tanh(sumA);
+		let numB = Math.tanh(sumB);
+		//arr[i] = MathOp(whichMathOp, numA, numB);
+		let sumOps = 0;
+		let rectOffsetForNode = square+n*numMathOps;
+		for(let whichMathOp=0; whichMathOp<numMathOps; whichMathOp++){
+			let addedMulipliedSinedEtc = MathOp(whichMathOp,numA,numB);
+			if(isNaN(addedMulipliedSinedEtc)){
+				throw 'addedMulipliedSinedEtc is NaN, MathOp('+whichMathOp+','+numA+','+numB+')';
+			}
+			let normed = Math.tanh(addedMulipliedSinedEtc); //range -1 to 1
+			let opWeightAtNode = arr[rectOffsetForNode+whichMathOp];
+			sumOps += opWeightAtNode*normed;
+		}
+		let neuralActivation = Math.tanh(sumOps); //range -1 to 1
+		ret[n] = neuralActivation;
+	}
+	//If scalar field, that scalar is ret[ret.length-1]. ret[0] should always be 1.
+	//After that are inputs. Then temp vars. Then output(s).)
+	return ret;
+};
+
+VecField.prototype.run = function(arr){
+	if(arr.length != this.numVars){
+		throw 'Expected arr.length to be '+this.numVars+' but its '+arr.length;
+	}
+	for(let i=this.numInputs; i<this.numVars; i++){
+		let opcode = this.opcodes[i];
+		let ptrA = (opcode>>>slideA)&maskPtrAfterSlide;
+		let ptrB = (opcode>>>slideB)&maskPtrAfterSlide;
+		let whichMathOp = opcode&maskOp;
+		let numA = arr[ptrA];
+		let numB = arr[ptrB];
+		arr[i] = MathOp(whichMathOp, numA, numB);
+	}
+};
+
+//returns a lambda that does the same thing as this.run(arr) when given arr param.
+//This will avoid the need for the switch statement. uses js eval. TODO.
+//TODO use cachedEval code (search for that) from my other code.
+VecField.prototype.compileLinearForCpu = function(arr){
+	throw 'TODO';
+};
+
+//Example: 100 instances of 12 inputs so 1200 numbers. Float32Array in and out.
+//TODO GPU.js optimize. reuse same kernel so its much lower lag after first time.
+//TODO an option to compute derivatives and try variants without copying the memory in,
+//generating most inputs instead, cuz that will be alot faster in gpujs.
+//Returns concat of the outputs as a Float32Array.
+VecField.prototype.runLinearManyOnGPU = function(manyInputs){
+	throw 'TODO';
+};
+
+//This is like a neuralnet but is more generally a forest of weightedSums,
+//then (FIXME might want to make this be part of opcode to choose tanh vs
+//leave sum as is vs other ops, for sumA and sumB) numA=tanh(weightedSumA) and numB=tanh(weightedSumB)
+//instead of numA and numB being directly copied from 2 indexs chosen by the int opcode.
+//So instead of a pointer you get a weightedSum, of all the diagonal indexs below current index.
+//tanh(x) is very near x when x is small, so that seems very general, except might want to scale it
+//during multiply sqrt exp log etc, so I do want the option for it not to always be tanh
+//and for it to be tanh in some and weightedSum as usual in others etc. In that case,
+//opcode should be 3 bytes,
+//that choose 3 mathOps instead of just 1. For the 2 sums and the combining of them.
+//Also, the mathops that use 1 param instead of 2 (such as sine arcsine log are 1, * and + and pow are 2)
+//should have an optimization in CPU (but go ahead and do both in GPU cuz branching is expensive)
+//not to do the weightedSums its not going to use.
+//
+//the arr in the "linear" way to run... arr.length**2==squareArr.length.
+//This is the doubleTriangleNeuralnet form of it, where each mathOp gets 2 tanh (FIXME or just the sum?)
+//of weightedSums, instead of a single number. FIXME might want to combine some both ways in the same VecField?
+//TODO try combos of things like
+//"mul(x,y)=tanh(atanh(x)*atanh(y)) allows mul(a,mul(b,c))=mul(mul(a,b),c) and keeps all numbers in range -1 to 1".
+VecField.prototype.runSquared = function(squareArr){
+	if(squareArr.length != this.numVars**2){
+		throw 'Expected arr.length to be '+this.numVars**2+' but its '+arr.length;
+	}
+	for(let i=this.numInputs; i<this.numVars; i++){
+		let opcode = this.opcodes[i];
+		//ignore cuz its all the lower diagonal indexs: let ptrA = (opcode>>>slideA)&maskPtrAfterSlide;
+		//ignore cuz its all the lower diagonal indexs: let ptrB = (opcode>>>slideB)&maskPtrAfterSlide;
+		let whichMathOp = opcode&maskOp;
+		//let numA = arr[ptrA]; //on diagonal
+		//let numB = arr[ptrB]; //on diagonal
+		let sumA = 0;
+		let sumB = 0;
+		for(let j=0; j<n; j++){ //sum left n-1 weights, and other is sum top n-1 weights, multiplied by other nodes.
+			let incomingNeuralActivation = squareArr[j*side+j];
+			let weightA = squareArr[n*side+j];
+			let weightB = squareArr[j*side+n];
+			sumA += weightA*incomingNeuralActivation;
+			sumB += weightB*incomingNeuralActivation;
+		}
+		//FIXME should this be a parameter, part of the int opcode, to tanh it vs leave it as is or what?
+		let numA = Math.tanh(sumA);
+		let numB = Math.tanh(sumB);
+		arr[i] = MathOp(whichMathOp, numA, numB);
+	}
+};
+/*
+var doubleTriangleNeuralnet = function(nodes, weights){
+	if(nodes.length**2 != weights.length){
+		throw '('+nodes.length+'=nodes.length)**2 != weights.length == '+weights.length;
+	}
+	let side = nodes.length;
+	for(let n=0; n<side; n++){
+		let isInputNode = weights[n*side+n]; //on diagonal. 1 for input node. 0 for internal or output node.
+		let sumA = 0;
+		let sumB = 0;
+		for(let i=0; i<n; i++){ //sum left n-1 weights, and other is sum top n-1 weights, multiplied by other nodes.
+			sumA += weights[n*side+i]*nodes[i];
+			sumB += weights[i*side+n]*nodes[i];
+		}
+		//range -2 to 2. Similar to GRU or LSTM node but simpler and feedforward.
+		let thisNeuralActivation = (Math.tanh(sumA)+1)*Math.tanh(sumB);
+		nodes[n] = nodes[n]*isInputNode + (1-isInputNode)*thisNeuralActivation;
+	}
+};
+*/
+
+/*throw
+`TODO like in ballsBouncingByScalarFieldGradient001.html compute gradient of VecField.numInputs
+by the 1 output (or could be multiple outputs but thats not a scalar field, thats a vector field,
+and scalar field is all I really need for neural qlearning of 3 bouncing balls).
+`;*/
+
+
+//TODO curvefit by rolling ball around aVecField.numInputs and numOutputs is 1 as a scalar field,
+//with momentum and velocity decay, just looking for a low energy (valley/hole) to stop in.
+
+
+
+
+
+
+
+
+//sigmoid is an affine transform of tanh
+var sigmoid = x=>1/(1+Math.exp(-x));
+
+
+
+var TriTriRect = function(numInputs, numNodes, numMathOps){
+	this.numInputs = numInputs;
+	this.numNodes = numNodes;
+	this.numMathOps = numMathOps;
+	this.square = numNodes**2;
+	this.rect = numNodes*numMathOps;
+	this.size = this.square+this.rect;
+	this.pos = new Float32Array(this.size);
+	this.pos[0] = 1; //neuralnet bias
+	this.vel = new Float32Array(this.size);
+};
+
+TriTriRect.prototype.randomizeSquare = function(){
+	for(let i=0; i<this.square; i++){
+		//would need double loop for 2 triangles, todo: let scale = 1/(1+Math.sqrt(i));
+		this.pos[i] = Math.random()*2-1; //FIXME take ave and stdDev params
+	}
+	this.pos[0] = 1; //neuralnet bias
+	for(let i=1; i<this.numNodes; i++){
+		this.pos[this.diag(i)] = 0;
+	}
+};
+
+TriTriRect.prototype.diag = function(i){
+	return i*(this.numNodes)+i;
+};
+
+TriTriRect.prototype.randomizeRect = function(){
+	let square = this.numNodes**2;
+	for(let i=this.square; i<this.size; i++){
+		this.pos[i] = Math.random()/this.numMathOps; //FIXME take ave and stdDev params
+		//this.pos[i] = 0; //FIXME
+	}
+	for(let node=0; node<this.numNodes; node++){
+		let randOp = randInt(this.numMathOps);
+		this.pos[this.indexNodeOp(node,randOp)] = 1; //for each node, pic 1 of the ops to make alot more likely than the others
+	}
+};
+
+TriTriRect.prototype.indexNodeNode = function(a,b){
+	return this.numNodes*a+b;
+};
+
+TriTriRect.prototype.indexNodeOp = function(node,op){
+	return this.square+this.numMathOps*node+op;
+};
+
+const ttrInputs = 1+2;
+const ttrNodes = 20;
+//const ttrNodes = 5;
+//const ttrNodes = 10;
+const ttrMathOps = numMathOps; //could be less if put the most important MathOps first and want smaller model.
+//const ttrMathOps = 12; //FIXME
+
+//the tritrirect model. TODO i also want a kind of model that may be more efficient in GPU.js
+//cuz of being fewer layers deep and using matmul, instead of 2 triangle arrays,
+//cuz the only way I know of so far to run it in GPUjs is to unroll the triangles into alot of literal GPU code
+//and run that many times in parallel.
+var ttr = new TriTriRect(ttrInputs, ttrNodes, ttrMathOps);
+ttr.randomizeSquare(); //FIXME add params
+ttr.randomizeRect(); //FIXME add params
+
+const ttrY = ttr.diag(1);
+const ttrX = ttr.diag(2);
+
+//given y and x, which can be in any range (but normally -1 to 1), return the raw output, which is in range -1 to 1 (cuz tanh)
+TriTriRect.prototype.pic = function(y,x){
+	let prevY = this.pos[ttrY];
+	let prevX = this.pos[ttrX];
+	this.pos[ttrY] = y;
+	this.pos[ttrX] = x;
+	let diag = doubleTrianglePlusOnehotRectangleModelForward(this.numInputs, this.numNodes, this.numMathOps, this.pos);
+	//console.log('diag='+JSON.stringify(diag)+' y='+y+' x='+x+' ttr.pos[ttrY]='+this.pos[ttrY]);
+	let output = diag[diag.length-1];
+	this.pos[ttrY] = prevY;
+	this.pos[ttrX] = prevX;
+	return output;
+};
+
+/*
+//given y and x in any range, though normal range is -1 to 1 (cuz ttr uses alot of tanh), returns brightness 0 to 1 (cuz of rule110 graphics system).
+var brightnessAtYXTtr = function(y,x,ttr){
+	let prevY = ttr.pos[ttrY];
+	let prevX = ttr.pos[ttrX];
+	ttr.pos[ttrY] = y;
+	ttr.pos[ttrX] = x;
+	let diag = doubleTrianglePlusOnehotRectangleModelForward(ttr.numInputNodes, ttr.numNodes, ttr.numMathOps, ttr.pos);
+	let output = diag[diag.length-1];
+	let normedOutput = sigmoid(output); //range 0 to 1, so it displays well in the rule110 graphics system (TODO) copied and modified from the other file
+	ttr.pos[ttrY] = prevY;
+	ttr.pos[ttrX] = prevX;
+	return normedOutput;
+};*/
+
+var displayHeight = function(){
+	return rule110SquareSide;
+};
+
+var displayWidth = function(){
+	return rule110SquareSide;
+};
+
+var displayIndex = function(y,x){
+	return displayWidth()*Math.floor(y)+Math.floor(x); //FIXME truncate y and x range
+};
+
+var displayPixelYXBright = function(y, x, bright){
+	rule110StatePosition[displayIndex(y,x)] = bright;
+};
+
+/*const rule110SquareSide = 128;
+
+//var rule110State = new Tensor([rule110SquareSide,rule110SquareSide]);
+var rule110StatePosition = new Float64Array(rule110SquareSide**2);
+*/
+var displayTtr = function(ttr){
+	let outputFromY = 10; //from this to ttr.numNodes-1
+	let outputFromX = 10;
+	let outputHeight = 50; //any chosen size, but make sure it fits in displayHeight()
+	let outputWidth = 50;
+	for(let oy=0; oy<outputHeight; oy++){
+		let oBifractionY = oy/outputHeight*2-1;
+		for(let ox=0; ox<outputWidth; ox++){
+			let oBifractionX = ox/outputWidth*2-1;
+			//let bright = brightnessAtYXTtr(oBifractionY, oBifractionX, ttr);
+			let bright = sigmoid(ttr.pic(oBifractionY, oBifractionX));
+			if(options.displayRandomGraphicsToShowWhereStuffIs) bright = .6+.1*Math.random();
+			displayPixelYXBright(outputFromY+oy, outputFromX+ox, bright);
+		}
+	}
+
+	let squareFromY = outputFromY+outputHeight+10;
+	let squareFromX = outputFromX;
+	for(let squareY=0; squareY<ttr.numNodes; squareY++){
+		for(let squareX=0; squareX<ttr.numNodes; squareX++){
+			let bright = sigmoid(ttr.pos[ttr.indexNodeNode(squareY,squareX)]);
+			if(options.displayRandomGraphicsToShowWhereStuffIs) bright = .4+.1*Math.random();
+			displayPixelYXBright(squareFromY+squareY, squareFromX+squareX, bright);
+		}
+	}
+
+	let rectFromY = squareFromY;
+	let rectFromX = squareFromX+ttr.numNodes+10;
+	for(let rectY=0; rectY<ttr.numNodes; rectY++){
+		for(let rectX=0; rectX<ttr.numMathOps; rectX++){ //FIXME is numMathOps vs numNodes reversed here?
+			let bright = sigmoid(ttr.pos[ttr.indexNodeOp(rectY,rectX)]);
+			if(options.displayRandomGraphicsToShowWhereStuffIs) bright = .2+.1*Math.random();
+			displayPixelYXBright(rectFromY+rectY, rectFromX+rectX, bright);
+		}
+	}
+};
+
+
+
+
+
+
+
+
+//////////////////////////////////////////////
+//This part copied then modified from TuringCompleteRule110Quasicrystal4SATSolverYouPaintWith2MouseButtons001.html
+//Im planning to remove the rule110 part from the copy and instead use it for displaying 3 rectangles of scalars:
+//a normal rectangle area where (y,x)->brightness, the numNodes**2 square, and the numNodes*numMathOps rectangle.
+
+
+
+
+
+
+
+
+
+
+
+
+
+//display and paint rule110 in this many pixels tall/wide.
+//const rule110SquareSide = 64;
+const rule110SquareSide = 128;
+
+//var rule110State = new Tensor([rule110SquareSide,rule110SquareSide]);
+var rule110StatePosition = new Float64Array(rule110SquareSide**2);
+
+var rule110StateVelocity = new Float64Array(rule110StatePosition.length);
+
+//per dt
+var velocityDecay = .1;
+
+//a 4 dimensional scalar field. TODO manually design this, or use a neural net to learn it?
+//Basically theres 16 possible combos of 4 bits, but as scalars its a smooth 4d field
+//that has valleys in those 16 places and hills everywhere else. Smaller hill between the 2 valleys
+//of a bit being 0 or 1, and big hill side that it will never cross as it goes out of bounds
+//(less than 0 or more than 1). The 4sat part of it is that only 8 of the 16 combos are allowed,
+//so make it higher in the other 8 that are not allowed. Will likely have to fiddle with this
+//after see it rolling around the state space on screen which will appear like a neuralnet
+//trying to learn to make what you paint look like rule110 (1d space, 1d time)
+//except its not a neuralnet. Its a convfield. The model is not a sigmoid or tanh or relu etc of weightedSum.
+//The model is a small scalar field summed as centered at each pixel.
+var rule110ConvFunc = (left,self,right,down)=>{
+	let sum = 0;
+	if(left < 0) sum += left**2;
+	if(left > 1) sum += (left-1)**2;
+	if(self < 0) sum += self**2;
+	if(self > 1) sum += (self-1)**2;
+	if(right < 0) sum += right**2;
+	if(right > 1) sum += (right-1)**2;
+	if(down < 0) sum += down**2;
+	if(down > 1) sum += (down-1)**2;
+
+	//sum += (left-self)**2 + (right-down)**2; //arbitrary experiment
+
+	//https://en.wikipedia.org/wiki/Rule_110
+	//Current pattern           111 110 101 100 011 010 001 000
+	//New state for center cell  0   1   1   0   1   1   1   0
+	let notLeft = 1-left;
+	let notSelf = 1-self;
+	let notRight = 1-right;
+	let notDown = 1-down;
+	sum += (left*self*right*down)**2; //111. exclude 111_1 cuz allow 111_0.
+	sum += (left*self*notRight*notDown)**2; //110. exclude 110_0 cuz allow 110_1.
+	sum += (left*notSelf*right*notDown)**2; //101 allow 1
+	sum += (left*notSelf*notRight*down)**2; //100 allow 0
+	sum += (notLeft*self*right*notDown)**2; //011 allow 1
+	sum += (notLeft*self*notRight*notDown)**2; //010 allow 1
+	sum += (notLeft*notSelf*right*notDown)**2; //001 allow 1
+	sum += (notLeft*notSelf*notRight*down)**2; //000 allow 0
+	
+	return sum;
+
+	//return (self-.5)**2; //FIXME this is just a test to see if it goes gray.
+};
+
+//Leave a 1 pixel border on all sides so dont cross the edge of the state square.
+var rule110ConvFuncAtYX = (state,y,x)=>{
+	let left = state[y*rule110SquareSide+(x-1)];
+	let self = state[y*rule110SquareSide+x];
+	let right = state[y*rule110SquareSide+x+1];
+	let down = state[(y+1)*rule110SquareSide+x];
+	return rule110ConvFunc(left,self,right,down);
+};
+
+const epsilon = .00001;
+
+//Leave a 2 pixel border on all sides so dont cross the edge of the state square.
+//This is the fast way to compute gradient. The slow way is rule110GradientAtYX_theSlowWay. Test it by comparing that. Should be same except roundoff.
+var rule110GradientAtYX = (state,y,x)=>{
+	let myIndex = y*rule110SquareSide+x;
+	let myVal = state[myIndex];
+	let myValPlusEpsilon = myVal+epsilon; //https://en.wikipedia.org/wiki/Fundamental_theorem_of_calculus
+	let noChange_imLeft = rule110ConvFuncAtYX(state,y,x+1);
+	let noChange_imSelf = rule110ConvFuncAtYX(state,y,x);
+	let noChange_imRight = rule110ConvFuncAtYX(state,y,x-1);
+	let noChange_imDown = rule110ConvFuncAtYX(state,y-1,x); //y+1 is down if im self. Im the down viewed from y-1.
+	state[myIndex] = myValPlusEpsilon; //TODO dont modify state. call rule110ConvFunc directly on various 4 scalars instead.
+	let plusEpsilon_imLeft = rule110ConvFuncAtYX(state,y,x+1);
+	let plusEpsilon_imSelf = rule110ConvFuncAtYX(state,y,x);
+	let plusEpsilon_imRight = rule110ConvFuncAtYX(state,y,x-1);
+	let plusEpsilon_imDown = rule110ConvFuncAtYX(state,y-1,x); //y+1 is down if im self. Im the down viewed from y-1.
+	state[myIndex] = myVal;
+	let noChangeFieldPart = noChange_imLeft+noChange_imSelf+noChange_imRight+noChange_imDown;
+	let plusEpsilonFieldPart = plusEpsilon_imLeft+plusEpsilon_imSelf+plusEpsilon_imRight+plusEpsilon_imDown;
+	let fieldChange = plusEpsilonFieldPart-noChangeFieldPart;
+	let gradient = fieldChange/epsilon;
+	return gradient;
+};
+
+var options = {
+	randomizeRule110StateOnce: false,
+	//randomizeRule110StateOnce: true,
+	enableRule110Physics: false,
+	//enableRule110Physics: true,
+	displayRandomGraphicsToShowWhereStuffIs: false,
+	//displayRandomGraphicsToShowWhereStuffIs: true,
+	//speed: 1,
+	speed: 10,
+	useUIControls: true, //if true, mouse paints the screen while rule110 inference etc happens. Else just the inference without user input.
+};
+
+var indexYX = (y,x)=>(y*rule110SquareSide+x);
+
+//sums the whole energy across the state, before and after adding epsilon to (y,x)'s position in state (then puts it back).
+var rule110GradientAtYX_theSlowWay = (state,y,x)=>{
+	let index = indexYX(y,x);
+	let noChange_height = rule110ScalarField(state);
+	let myVal = state[index];
+	let myValPlusEpsilon = myVal+epsilon;
+	state[index] = myValPlusEpsilon;
+	let plusEpsilon_height = rule110ScalarField(state);
+	state[index] = myVal; //put state back how it was
+	return (plusEpsilon_height-noChange_height)/epsilon;
+};
+
+var testGradients = ()=>{
+	let randomState = new Float64Array(rule110SquareSide**2);
+	randomizeState(randomState);
+	let maxDiff = 0;
+	//let maxFastGradient = 0;
+	//let maxSlowGradient = 0;
+	//for(let y=2; y<rule110SquareSide-2; y++){
+
+	/*
+	https://twitter.com/benrayfield/status/1648126027330211842/photo/1
+	It computes calculus gradients sparsely nomatter how many dimensions.
+	If had million dimensions (like neural painting 100x100x100 minecraft-like conways game of life),
+	derivative in each dimension doesnt check all 100x100x100, just does position vs position+epsilon in near cells
+	*/
+	
+	/*
+	//FIXME it seems to differ in the gradients near the borders but be almost the same (except roundoff) everywhere else.
+	y2 x52 fastGradient=-0.277733256337509 slowGradient=-0.7224725322885205 diff=0.4447392759510115
+	ConvfieldDemo3.html:152 y2 x53 fastGradient=2.333777490415301 slowGradient=0.8815183434762729 diff=1.4522591469390278
+	ConvfieldDemo3.html:152 y2 x54 fastGradient=0.31560389558982216 slowGradient=-0.317250032821903 diff=0.6328539284117252
+	ConvfieldDemo3.html:152 y2 x55 fastGradient=1.078950811728152 slowGradient=0.15006259559413593 diff=0.9288882161340162
+	ConvfieldDemo3.html:152 y2 x56 fastGradient=0.3531722215011079 slowGradient=-0.39714111039756966 diff=0.7503133318986775
+	ConvfieldDemo3.html:152 y2 x57 fastGradient=-0.3156030984996505 slowGradient=-0.6171976224322862 diff=0.30159452393263564
+	ConvfieldDemo3.html:152 y2 x58 fastGradient=2.960077159297469 slowGradient=0.9781205164927086 diff=1.9819566428047604
+	ConvfieldDemo3.html:152 y2 x59 fastGradient=2.7677756098132273 slowGradient=0.7841213289339065 diff=1.9836542808793207
+	ConvfieldDemo3.html:152 y2 x60 fastGradient=0.16167112688592056 slowGradient=-0.7593852387799415 diff=0.921056365665862
+	ConvfieldDemo3.html:152 y2 x61 fastGradient=1.0276074649318012 slowGradient=0.08509235840392647 diff=0.9425151065278747
+	ConvfieldDemo3.html:152 y3 x2 fastGradient=-1.820776016958625 slowGradient=-1.9068868368776746 diff=0.08611081991904967
+	ConvfieldDemo3.html:152 y3 x3 fastGradient=-0.951113023417438 slowGradient=-0.9511130201644845 diff=3.2529534621517087e-9
+	ConvfieldDemo3.html:152 y3 x4 fastGradient=0.6942922322505928 slowGradient=0.6942922311736764 diff=1.0769163338864018e-9
+	ConvfieldDemo3.html:152 y3 x5 fastGradient=0.07435765214947043 slowGradient=0.07435765496666136 diff=2.8171909249863347e-9
+	ConvfieldDemo3.html:152 y3 x6 fastGradient=0.20519869858848236 slowGradient=0.205198699632092 diff=1.0436096431476471e-9
+	ConvfieldDemo3.html:152 y3 x7 fastGradient=-1.1899204198417834 slowGradient=-1.1899204196197388 diff=2.220446049250313e-10
+	ConvfieldDemo3.html:152 y3 x8 fastGradient=-1.2161471216631803 slowGradient=-1.2161471204308327 diff=1.2323475573339238e-9
+	ConvfieldDemo3.html:152 y3 x9 fastGradient=-0.5184165823401976 slowGradient=-0.5184165786431549 diff=3.6970426720017713e-9
+	ConvfieldDemo3.html:152 y3 x10 fastGradient=0.4517792568048406 slowGradient=0.4517792604019632 diff=3.597122599785507e-9
+	*/
+	
+	console.log('FIXME it seems to differ in the gradients near the borders but be almost the same (except roundoff) everywhere else.');
+	for(let y=3; y<rule110SquareSide-3; y++){
+		//for(let x=2; x<rule110SquareSide-2; x++){
+		for(let x=3; x<rule110SquareSide-2; x++){
+			let fastGradient = rule110GradientAtYX(randomState,y,x);
+			if(isNaN(fastGradient)) throw 'fastGradient is NaN at y'+y+' x'+x;
+			let slowGradient = rule110GradientAtYX_theSlowWay(randomState,y,x);
+			if(isNaN(slowGradient)) throw 'slowGradient is NaN at y'+y+' x'+x;
+			let diff = Math.abs(fastGradient-slowGradient);
+			console.log('y'+y+' x'+x+' fastGradient='+fastGradient+' slowGradient='+slowGradient+' diff='+diff);
+			maxDiff = Math.max(maxDiff, diff);
+			if(diff > epsilon){
+				throw 'Gradient is computed wrong. fastGradient='+fastGradient+' and slowGradient='+slowGradient+' at y'+y+' x'+x+' in a randomState, but they should be the same except roundoff.'
+			}
+		}
+	}
+	console.log('testGradients tests pass. The fast way of computing gradient gives the same answer (except roundoff) as the slow way. maxDiff='+maxDiff+' but FIXME make it do so closer to the border, as the gradients were differing 2 pixels away but 3 or more pixels away and it works.');
+};
+
+//a function of rule110SquareSide*rule110SquareSide scalars (pixel brightnesses) to 1 scalar (potential-energy),
+//that the state space rolls along (with momentum and a little friction) to find lower energy states
+//which better solve the convolutional 4SAT constraints centered at each pixel.
+//The state param is a Float64Array of size rule110SquareSide*rule110SquareSide.
+var rule110ScalarField = state=>{
+	let field = 0;
+	for(let y=2; y<rule110SquareSide-2; y++){ //FIXME? exclude a 2 pixel border on all 4 sides so the 4-SAT doesnt go out of range.
+		for(let x=2; x<rule110SquareSide-2; x++){
+			field += rule110ConvFuncAtYX(state,y,x);
+		}
+	}
+	return field;
+};
+
+//modifies state. in other code, just use the inside of it other than that 2 pixel thick border on all 4 sides.
+var zeroOutA2PixelBorder = state=>{
+	for(let y=0; y<rule110SquareSide; y++){
+		for(let x=0; x<rule110SquareSide; x++){
+			if(x<2 || x>=rule110SquareSide-2 || y<2 || y>=rule110SquareSide-2){
+				state[y*rule110SquareSide+x] = 0;
+			}
+		}
+	}
+};
+
+//modifies state, but not the parts on 2 pixel border on all 4 sides.
+var randomizeState = state=>{
+    for(let y=2; y<rule110SquareSide-2; y++){
+		for(let x=2; x<rule110SquareSide-2; x++){
+			state[y*rule110SquareSide+x] = Math.random();
+		}
+	}
+};
+
+if(options.randomizeRule110StateOnce){
+	randomizeState(rule110StatePosition);
+}
+zeroOutA2PixelBorder(rule110StatePosition);
+
+var gradientVec = state=>{
+    let gradient = new Float64Array(state.length);
+    for(let y=2; y<rule110SquareSide-2; y++){
+		for(let x=2; x<rule110SquareSide-2; x++){
+			gradient[y*rule110SquareSide+x] = rule110GradientAtYX(state,y,x);
+		}
+	}
+    return gradient;
+};
+
+//updates rule110StatePosition and rule110StateVelocity.
+//dt is change in time, but u can just give it arbitrary number like .01 for now.
+//TODO energy norming so it doesnt get more and more jumpy until getting too fast, or too slow crawls to a halt.
+//TODO Do that thing like position**2 + velocity**2 = constant in that sparseDoppler experiment i did with microphone
+//but more generally using the scalarField as potentialEnergy.
+var nextStateRule110 = function(dt){
+	if(options.useUIControls){
+		uiControlsPaintOntoState(rule110StatePosition,rule110StateVelocity);
+	}
+    let gradient = gradientVec(rule110StatePosition);
+	let mulVelocity = Math.max(0,Math.min(1-dt*velocityDecay,1));
+    for(let i=0; i<rule110StatePosition.length; i++){
+        rule110StateVelocity[i] -= gradient[i]*dt; //FIXME is that right? divide by a constant? Squared? Sqrt? Of what is it?
+		rule110StateVelocity[i] *= mulVelocity;
+        //TODO velocity decay
+        rule110StatePosition[i] += rule110StateVelocity[i]*dt;
+    }
+};
+
+
+//https://github.com/benrayfield/jsutils/blob/master/src/FullScreenCanvasPrototype.html
+
+//Ben F Rayfield offers this code as opensource MIT license
+
+//byte offsets for ByteRect, canvas, etc, in js.
+const RED = 0, GREEN = 1, BLUE = 2, ALPHA = 3;
+
+var FullScreenCanvas = function(parentDom){ //FullScreenCanvas opensource MIT licensed by Ben F Rayfield
+	if(parentDom === undefined) parentDom = document.body;
+	this.dom = document.createElement('canvas');
+	//TODO z order, in front of everything else.
+	//this.dom = document.getElementById('canv'); //FIXME remove this line, use createElement instead.
+	this.context = null;
+	this.imageData = null;
+	this.pixels = null;
+	this.byteRect = null;
+	parentDom.appendChild(this.dom);
+	this.dom.style.position = 'absolute';
+	this.dom.style.left = '0px';
+	this.dom.style.top = '0px';
+	
+	this.resizeCanvas = function(){
+		if(this.dom.width != window.innerWidth) this.dom.width = window.innerWidth;
+		if(this.dom.height != window.innerHeight) this.dom.height = window.innerHeight;
+	};
+	
+	//TODO optimize, if you're not reading from the canvas, maybe can skip parts of this or only call this once?
+	this.beforePaint = function(){
+		if(this.dom == null) throw 'No canvas';
+		this.context = this.dom.getContext('2d');
+		//console.log('this.dom.width = '+this.dom.width);
+		this.imageData = this.context.getImageData(0, 0, this.dom.width, this.dom.height);
+		this.pixels = this.imageData.data;
+		this.byteRect = new ByteRect(this.pixels, this.dom.height, this.dom.width);
+	};
+	
+	//call this after modify byteRect.bytes which contains pixel colors to write to Canvas.
+	this.afterPaint = function(){
+		if(this.dom == null) throw 'No canvas';
+		//this.context.drawImage(this.dom, 0, 0, this.dom.width, this.dom.height);
+		this.context.putImageData(this.imageData, 0, 0);
+	};
+	
+	this.removeFromScreen = function(){
+		this.dom.remove();
+		this.dom = null;
+		this.context = null;
+		this.imageData = null;
+		this.pixels = null;
+		this.byteRect = null;
+	};
+	
+	this.resizeCanvas();
+	this.beforePaint();
+};
+
+var ByteRect = function(bytes, height, width){ //ByteRect opensource MIT licensed by Ben F Rayfield (has more funcs other places)
+	this.bytes = bytes;
+	this.height = height;
+	this.width = width;
+};
+
+var canv = null;
+
+var time = ()=>Date.now()*.001; //utc seconds
+
+var randByte = ()=>Math.floor(Math.random()*256);
+
+var pixelsPerCell = 6;
+
+var sigmoid = x=>1/(1+Math.exp(-x));
+
+var doPageTransitioningGraphics = function(dt, age, byteRect){
+
+	displayTtr(ttr);
+
+	/*for(let i=0; i<byteRect.bytes.length; i+=4){
+		byteRect.bytes[i+RED] = randByte();
+		byteRect.bytes[i+GREEN] = randByte();
+		byteRect.bytes[i+BLUE] = randByte();
+		byteRect.bytes[i+ALPHA] = 255;
+	}*/
+
+	if(options.enableRule110Physics){
+		nextStateRule110(dt*options.speed);
+	}
+
+	for(let y=0; y<rule110SquareSide; y++){
+		for(let x=0; x<rule110SquareSide; x++){
+			let positionInThatDimension = rule110StatePosition[y*rule110SquareSide+x];
+			let red = Math.floor(sigmoid(positionInThatDimension*4-2)*255.9999); //0..255
+			let green = red;
+			let blue = green;
+			let pixYStart = y*pixelsPerCell;
+			let pixXStart = x*pixelsPerCell;
+			for(let pixY=pixYStart; pixY<(pixYStart+pixelsPerCell); pixY++){
+				for(let pixX=pixXStart; pixX<(pixXStart+pixelsPerCell); pixX++){
+					let i = (pixY*byteRect.width+pixX)*4;
+					byteRect.bytes[i+RED] = red;
+					byteRect.bytes[i+GREEN] = green;
+					byteRect.bytes[i+BLUE] = blue;
+					byteRect.bytes[i+ALPHA] = 255;
+				}
+			}
+		}
+	}
+};
+
+var uiControlsPaintOntoState = (statePosition,stateVelocity)=>{
+	let index = indexYX(controls.mouseYCell, controls.mouseXCell);
+	if(controls.mouseButton0){ //left mouse button
+		statePosition[index] = 1; //paint white
+		stateVelocity[index] = 0;
+	}else if(controls.mouseButton2){ //right mouse button
+		statePosition[index] = 0; //paint black
+		stateVelocity[index] = 0;
+	}
+};
+
+var timeStarted = time();
+
+var prevTime = timeStarted;
+
+var controls = {mouseXCell: 0, mouseYCell: 0, mouseButton0: 0, mouseButton2: 0};
+
+var nextState = function(){
+	if(canv == null){
+		canv = new FullScreenCanvas();
+		canv.dom.addEventListener('mousemove', event=>{
+			controls.mouseYCell = Math.max(0, Math.min(Math.floor(event.clientY/pixelsPerCell), rule110SquareSide-1));
+			controls.mouseXCell = Math.max(0, Math.min(Math.floor(event.clientX/pixelsPerCell), rule110SquareSide-1));
+		});
+		canv.dom.addEventListener('mousedown', event=>{
+			controls['mouseButton'+event.button] = 1;
+		});
+		canv.dom.addEventListener('mouseup', event=>{
+			controls['mouseButton'+event.button] = 0;
+		});
+		canv.dom.addEventListener('contextmenu', event=>event.preventDefault()); //prevent right click popup menu from canvas, so that button paints black instead
+	}
+	let now = time();
+	let age = now-timeStarted;
+	let dt = Math.max(0, Math.min(now-prevTime, .2));
+	prevTime = now;
+	canv.beforePaint();
+	doPageTransitioningGraphics(dt, age, canv.byteRect);
+	canv.afterPaint();
+	setTimeout(nextState, 1);
+};
+
+window.onload = ()=>{
+	nextState();
+};
+
+</script>
