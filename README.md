@@ -1,7 +1,8 @@
 # ForestCurveFit
 TODO. in theory... CPU or optional GPU.js optimized curve fitter for scalar fields up to 4096 dimensions, such as training a small neuralnet near instantly. tensorflowjs was being slow and I just wanted it to do something small.
 
-TODO pic here
+Some random models in <a href="https://github.com/benrayfield/ForestCurveFit/blob/main/earlyExperiments/ForestCurveFit002.html">earlyExperiments/ForestCurveFit002.html</a>. Its not curve-fitting yet but will be soon in CPU, and might have to make some changes to GPU optimize it but the plan is to make a UI similar to the graphics square on the right (but not the controls on the left) at https://playground.tensorflow.org/ and have the user put the include and exclude dots in the pic and watch it curvefit live. After thats working, maybe it will turn out to be fast enoufh for live neura qlearning of the 12d game of 3 bouncing balls?<br>
+<img src="https://github.com/benrayfield/ForestCurveFit/blob/main/earlyExperiments/ForestCurveFit002.png?raw=true">
 
 Once I get this working hopefully it will be fast enough for around a 300-dimensional scalar field
 to approximate the Q-score function for neural-qlearning of a 12 dimensional game state
